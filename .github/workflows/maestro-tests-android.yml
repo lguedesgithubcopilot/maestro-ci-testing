@@ -23,6 +23,7 @@ jobs:
         run: |
           export MAESTRO_VERSION=1.39.0
           curl -Ls "https://get.maestro.mobile.dev" | bash
+          export PATH="$PATH:$HOME/.maestro/bin"
 
       - name: Start Android Emulator
         uses: reactivecircus/android-emulator-runner@v2
@@ -37,11 +38,8 @@ jobs:
             adb install wikipedia.apk
             
             DEVICE_ID=$(adb devices | grep emulator | cut -f 1)
-
-      - name: Run Maestro UI tests
-        run: |
-          export PATH="$PATH:$HOME/.maestro/bin"
-          maestro --device $DEVICE_ID test android-flow.yaml
+            export PATH="$PATH:$HOME/.maestro/bin"
+            maestro --device $DEVICE_ID test android-flow.yaml
 
       - name: Upload report
         if: always()
