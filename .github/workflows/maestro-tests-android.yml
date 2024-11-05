@@ -8,7 +8,7 @@ env:
 jobs:
   run_android_e2e:
     timeout-minutes: 30
-    runs-on: macos-latest  # macOS-latest for Android emulator compatibility
+    runs-on: macos-12
 
     steps:
       # Step 1: Checkout the code
@@ -16,70 +16,64 @@ jobs:
         with:
           fetch-depth: 1
 
-      # Step 2: Install dependencies and Maestro CLI
-      - name: Install dependencies and Maestro CLI
+      # Step 2: Setup Android SDK
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: 26
+          arch: x86_64
+          # Path where the SDK will be installed
+          android-home: ${{ github.workspace }}/android-sdk
+
+      # Step 3: Install Maestro CLI
+      - name: Install Maestro CLI
         run: |
           export MAESTRO_VERSION=1.39.0
           curl -Ls "https://get.maestro.mobile.dev" | bash
           arch -arm64 brew install jq
 
-      # Step 3: Set up Java 17 (required for Android SDK)
-      - name: Setup Java 17
-        uses: actions/setup-java@v3
-        with:
-          distribution: temurin
-          java-version: 17  # Using Java 17 instead of 11
-
-      # Step 4: Set up Android Emulator (API Level 29 as an example)
-      - name: Set up Android Emulator
+      # Step 4: Start Android Emulator (Nexus 4)
+      - name: Start Android Emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 29
+          api-level: 26
           target: default
           arch: x86_64
-          cores: 2
-          ram-size: 2048M
-          force-avd-creation: false
-          emulator-boot-timeout: 600  # 10 minutes
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: true
-          pre-emulator-launch-script: |
-            echo "Running pre-emulator launch script. Printing the working directory now:"
-            pwd
+          profile: Nexus 4
+          emulator-options: -no-window -no-boot-anim -no-audio -no-snapshot-load
           script: |
-            # Ensure ADB server is running properly
+            # Ensure the emulator is fully booted and waiting for the device to be ready
             adb kill-server
             adb start-server
-
-            # List all connected devices (emulators)
             adb devices
+            adb wait-for-device  # Ensure the emulator is ready before proceeding
 
-            # Check for connected emulator (e.g., emulator-5554)
-            EMULATOR_DEVICE=$(adb devices | grep emulator | cut -f1)
+      # Step 5: Install APK and Run Maestro UI tests
+      - name: Install APK and Run Maestro UI tests
+        run: |
+          # Ensure the device is available
+          EMULATOR_DEVICE=$(adb devices | grep emulator | cut -f1)
 
-            if [ -z "$EMULATOR_DEVICE" ]; then
-              echo "No emulator device found."
-              exit 1
-            fi
+          if [ -z "$EMULATOR_DEVICE" ]; then
+            echo "No emulator device found."
+            exit 1
+          fi
 
-            echo "Using emulator device: $EMULATOR_DEVICE"
+          # Wait for the emulator to fully boot up
+          adb -s $EMULATOR_DEVICE wait-for-device
 
-            # Wait for the emulator to fully boot
-            adb -s $EMULATOR_DEVICE wait-for-device
+          # Install the Wikipedia APK on the emulator
+          adb -s $EMULATOR_DEVICE install wikipedia.apk
 
-            # Install the Wikipedia APK on the emulator
-            adb -s $EMULATOR_DEVICE install wikipedia.apk
+          # Run Maestro E2E tests on the emulator
+          maestro --device $EMULATOR_DEVICE test android-flow.yaml
 
-            # Run Maestro E2E tests
-            maestro --device $EMULATOR_DEVICE test android-flow.yaml
-            # Replace "android-flow.yaml" with your actual flow file if needed
-
-      # Step 5: Upload the test report and screenshots (if available)
+      # Step 6: Upload reports and artifacts
       - name: Upload report
         if: always()
         uses: actions/upload-artifact@v3
         with:
-          name: E2E Report (Android API 29, x86_64)
+          name: E2E Report (Android)
           path: |
             ${{ github.workspace }}/*.mp4
             ${{ github.workspace }}/*.png
