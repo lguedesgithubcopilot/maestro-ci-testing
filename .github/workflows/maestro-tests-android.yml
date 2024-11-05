@@ -8,7 +8,7 @@ env:
 jobs:
   run_android_e2e:
     timeout-minutes: 30
-    runs-on: macos-12
+    runs-on: macos-13  # Set macOS 13 as the runner environment
 
     steps:
       # Step 1: Checkout the code
@@ -16,7 +16,14 @@ jobs:
         with:
           fetch-depth: 1
 
-      # Step 2: Setup Android SDK
+      # Step 2: Set up JDK 17
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: 'adopt'
+
+      # Step 3: Setup Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
@@ -25,14 +32,14 @@ jobs:
           # Path where the SDK will be installed
           android-home: ${{ github.workspace }}/android-sdk
 
-      # Step 3: Install Maestro CLI
+      # Step 5: Install Maestro CLI
       - name: Install Maestro CLI
         run: |
           export MAESTRO_VERSION=1.39.0
           curl -Ls "https://get.maestro.mobile.dev" | bash
           arch -arm64 brew install jq
 
-      # Step 4: Start Android Emulator (Nexus 4)
+      # Step 6: Start Android Emulator (Nexus 4)
       - name: Start Android Emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -48,7 +55,7 @@ jobs:
             adb devices
             adb wait-for-device  # Ensure the emulator is ready before proceeding
 
-      # Step 5: Install APK and Run Maestro UI tests
+      # Step 7: Install APK and Run Maestro UI tests
       - name: Install APK and Run Maestro UI tests
         run: |
           # Ensure the device is available
@@ -67,8 +74,9 @@ jobs:
 
           # Run Maestro E2E tests on the emulator
           maestro --device $EMULATOR_DEVICE test android-flow.yaml
+          # Replace "android-flow.yaml" with your actual Maestro flow file
 
-      # Step 6: Upload reports and artifacts
+      # Step 8: Upload reports and artifacts
       - name: Upload report
         if: always()
         uses: actions/upload-artifact@v3
