@@ -1,58 +1,58 @@
-name: Android Instrumentation Test
+name: Android E2E Tests
 
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+on: [push, pull_request]
 
 jobs:
-  android_test:
-    name: Running Android Tests
-    runs-on: macos-14
-    continue-on-error: true
+  run_android_e2e:
+    timeout-minutes: 10
+    runs-on: buildjet-2vcpu-ubuntu-2204
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      # Step 2: Install dependencies and Maestro
-      - name: Install dependencies and Maestro
-        run: |
-          export MAESTRO_VERSION=1.39.0
-          curl -Ls "https://get.maestro.mobile.dev" | bash
-          arch -arm64 brew tap facebook/fb
-          arch -arm64 brew install facebook/fb/idb-companion
-          arch -arm64 brew install jq
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v3
         with:
-          java-version: 17
-          distribution: 'adopt'
+          fetch-depth: 1
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 11
+
+      - name: Install Maestro
+        run: MAESTRO_VERSION=1.30.4 curl -Ls 'https://get.maestro.mobile.dev' | bash
 
       - name: Start Android Emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 26
-          target: default
-          arch: x86_64
-          profile: Nexus 4
-          emulator-options: -no-window -no-boot-anim -no-audio -no-snapshot-load
+          api-level: 26  
+          target: default 
+          arch: x86_64 
+          cores: 2 
+          ram-size: 2048M 
+          force-avd-creation: true
+          emulator-boot-timeout: 600
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
           script: |
+            # Wait for the emulator to boot
             adb wait-for-device
-            adb shell input keyevent 82
+            adb shell input keyevent 82  # Unlock the device
+            
+            # Install the APK
+            adb install ./wikipedia.apk
+            
+            # Run Maestro E2E tests
+            DEVICE_ID=$(adb devices | grep emulator | cut -f 1)
+            maestro --device $DEVICE_ID test android-flow.yaml
 
-      - name: Install APK on Emulator
-        run: |
-          adb install ./wikipedia.apk
-
-      - name: Run Maestro UI tests
-        run: |
-          export PATH="$PATH:$HOME/.maestro/bin"
-          DEVICE_ID=$(adb devices | grep emulator | cut -f 1)
-          maestro --device $DEVICE_ID test android-flow.yaml
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: E2E Report
+          path: |
+            ${{ github.workspace }}/*.mp4
+            ${{ github.workspace }}/*.png
+            ${{ github.workspace }}/report*.xml
+            ~/.maestro/tests/**/*
