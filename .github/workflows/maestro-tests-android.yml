@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
   run_android_e2e:
     timeout-minutes: 10
-    runs-on: macos-latest
+    runs-on: macos-12
 
     steps:
       # Step 1: Checkout the code
