@@ -8,7 +8,7 @@ env:
 jobs:
   run_android_e2e:
     timeout-minutes: 30
-    runs-on: macos-latest  # macOS latest runner for Android emulator support
+    runs-on: macos-latest  # macOS-latest for Android emulator compatibility
 
     steps:
       # Step 1: Checkout the code
@@ -16,21 +16,21 @@ jobs:
         with:
           fetch-depth: 1
 
-      # Step 2: Install necessary dependencies and Maestro CLI
+      # Step 2: Install dependencies and Maestro CLI
       - name: Install dependencies and Maestro CLI
         run: |
           export MAESTRO_VERSION=1.39.0
           curl -Ls "https://get.maestro.mobile.dev" | bash
           arch -arm64 brew install jq
 
-      # Step 3: Set up Java (required by Maestro and Android emulator)
-      - name: Setup Java
+      # Step 3: Set up Java 17 (required for Android SDK)
+      - name: Setup Java 17
         uses: actions/setup-java@v3
         with:
           distribution: temurin
-          java-version: 11
+          java-version: 17  # Using Java 17 instead of 11
 
-      # Step 4: Install and start Android Emulator (API Level 29 as an example)
+      # Step 4: Set up Android Emulator (API Level 29 as an example)
       - name: Set up Android Emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -44,19 +44,22 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           pre-emulator-launch-script: |
-            echo "Running pre emulator launch script. Printing the working directory now:"
+            echo "Running pre-emulator launch script. Printing the working directory now:"
             pwd
           script: |
-            npx envinfo                 # Check memory usage
+            # Ensure ADB server is running properly
+            adb kill-server
+            adb start-server
 
+            npx envinfo                 # Check memory usage
             adb devices                 # Verify emulator is running
 
             # Install the Wikipedia APK on the emulator
             adb install wikipedia.apk   # Install the Wikipedia APK
 
-            # Run the Maestro E2E tests
+            # Run Maestro E2E tests
             maestro --device android test android-flow.yaml
-            # You can replace "android-flow.yaml" with the path to your actual flow file
+            # Replace "android-flow.yaml" with your actual flow file if needed
 
       # Step 5: Upload the test report and screenshots (if available)
       - name: Upload report
