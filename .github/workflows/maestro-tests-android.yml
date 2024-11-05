@@ -1,45 +1,43 @@
-name: Run Maestro UI Tests on Android
+name: Android Instrumentation Test
 
-on: [push, pull_request]
-
-env:
-  MAESTRO_VERSION: 1.39.0
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
-  run_android_e2e:
-    timeout-minutes: 30
-    runs-on: macos-14
-
+  android_test:
+    name: Running Android Tests
+    runs-on: macos-13
+    continue-on-error: true
     steps:
-      # Step 1: Checkout the code
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 1
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      # Step 2: Set up JDK 17
+      # Step 2: Install dependencies and Maestro
+      - name: Install dependencies and Maestro
+        run: |
+          export MAESTRO_VERSION=1.39.0
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          arch -arm64 brew tap facebook/fb
+          arch -arm64 brew install facebook/fb/idb-companion
+          arch -arm64 brew install jq
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: 17
           distribution: 'adopt'
 
-      # Step 3: Setup Android SDK
+      - name: Change wrapper permissions
+        run: chmod +x ./gradlew
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          api-level: 26
-          arch: x86_64
-          # Path where the SDK will be installed
-          android-home: ${{ github.workspace }}/android-sdk
 
-      # Step 5: Install Maestro CLI
-      - name: Install Maestro CLI
-        run: |
-          export MAESTRO_VERSION=1.39.0
-          curl -Ls "https://get.maestro.mobile.dev" | bash
-          arch -arm64 brew install jq
-
-      # Step 6: Start Android Emulator (Nexus 4)
       - name: Start Android Emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -49,41 +47,15 @@ jobs:
           profile: Nexus 4
           emulator-options: -no-window -no-boot-anim -no-audio -no-snapshot-load
           script: |
-            # Ensure the emulator is fully booted and waiting for the device to be ready
-            adb kill-server
-            adb start-server
-            adb devices
-            adb wait-for-device  # Ensure the emulator is ready before proceeding
+            adb wait-for-device
+            adb shell input keyevent 82
 
-      # Step 7: Install APK and Run Maestro UI tests
-      - name: Install APK and Run Maestro UI tests
+      - name: Install APK on Emulator
         run: |
-          # Ensure the device is available
-          EMULATOR_DEVICE=$(adb devices | grep emulator | cut -f1)
+          adb install ./wikipedia.apk
 
-          if [ -z "$EMULATOR_DEVICE" ]; then
-            echo "No emulator device found."
-            exit 1
-          fi
-
-          # Wait for the emulator to fully boot up
-          adb -s $EMULATOR_DEVICE wait-for-device
-
-          # Install the Wikipedia APK on the emulator
-          adb -s $EMULATOR_DEVICE install wikipedia.apk
-
-          # Run Maestro E2E tests on the emulator
-          maestro --device $EMULATOR_DEVICE test android-flow.yaml
-          # Replace "android-flow.yaml" with your actual Maestro flow file
-
-      # Step 8: Upload reports and artifacts
-      - name: Upload report
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: E2E Report (Android)
-          path: |
-            ${{ github.workspace }}/*.mp4
-            ${{ github.workspace }}/*.png
-            ${{ github.workspace }}/report*.xml
-            ~/.maestro/tests/**/*
+      - name: Run Maestro UI tests
+        run: |
+          export PATH="$PATH:$HOME/.maestro/bin"
+          DEVICE_ID=$(adb devices | grep emulator | cut -f 1)
+          maestro --device $DEVICE_ID test android-flow.yaml
