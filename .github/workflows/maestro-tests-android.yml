@@ -51,14 +51,27 @@ jobs:
             adb kill-server
             adb start-server
 
-            npx envinfo                 # Check memory usage
-            adb devices                 # Verify emulator is running
+            # List all connected devices (emulators)
+            adb devices
+
+            # Check for connected emulator (e.g., emulator-5554)
+            EMULATOR_DEVICE=$(adb devices | grep emulator | cut -f1)
+
+            if [ -z "$EMULATOR_DEVICE" ]; then
+              echo "No emulator device found."
+              exit 1
+            fi
+
+            echo "Using emulator device: $EMULATOR_DEVICE"
+
+            # Wait for the emulator to fully boot
+            adb -s $EMULATOR_DEVICE wait-for-device
 
             # Install the Wikipedia APK on the emulator
-            adb install wikipedia.apk   # Install the Wikipedia APK
+            adb -s $EMULATOR_DEVICE install wikipedia.apk
 
             # Run Maestro E2E tests
-            maestro --device android test android-flow.yaml
+            maestro --device $EMULATOR_DEVICE test android-flow.yaml
             # Replace "android-flow.yaml" with your actual flow file if needed
 
       # Step 5: Upload the test report and screenshots (if available)
