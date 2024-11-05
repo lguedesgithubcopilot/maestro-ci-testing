@@ -5,6 +5,8 @@ appId: org.wikimedia.wikipedia
 - repeat:
     times: 3
     commands:
-      - tapOn: Next
+      - swipe:
+          direction: LEFT
+          duration: 400
       - waitForAnimationToEnd
 - tapOn: Get started
