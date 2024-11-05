@@ -38,9 +38,12 @@ jobs:
             adb install wikipedia.apk
             
             DEVICE_ID=$(adb devices | grep emulator | cut -f 1)
-            export PATH="$PATH":"$HOME/.maestro/bin"
-            maestro --device $DEVICE_ID test android-flow.yaml
 
+      - name: Run Maestro UI tests
+        run: |
+          export PATH="$PATH:$HOME/.maestro/bin"
+          maestro test android-flow.yaml
+  
       - name: Upload report
         if: always()
         uses: actions/upload-artifact@v3
