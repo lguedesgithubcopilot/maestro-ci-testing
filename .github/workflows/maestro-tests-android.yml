@@ -39,32 +39,22 @@ jobs:
         arch: x86_64
         ram-size: 2048M
         target: default
-        cores: 2
-        avd-name: test
-        force-avd-creation: true
-        emulator-boot-timeout: 600
-        emulator-port: 5554
-        emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-        disable-animations: true
-        disable-spellchecker: false
-        disable-linux-hw-accel: auto
-        enable-hw-keyboard: false
-        channel: stable
-      env:
-        JAVA_HOME: /Users/runner/hostedtoolcache/Java_Adopt_jdk/11.0.25-9/x64/Contents/Home
-
-    # Step 5: Wait for emulator to be fully ready
-    - name: Wait for Emulator to be ready
+        # Optional: specify additional options like screen size, etc.
+    
+    # Step 5: Kill and restart the ADB server (to fix connection issues)
+    - name: Restart ADB server
       run: |
-        # Wait until the emulator is booted and ready to accept ADB commands
-        adb -s emulator-5554 wait-for-device
-        adb shell getprop sys.boot_completed | grep -m 1 '1'
+        # Kill any running ADB server and start a new one
+        adb kill-server
+        adb start-server
 
-    # Step 6: Install the APK on the emulator (Wikipedia APK)
+    # Step 6: Install the APK on emulator (Wikipedia APK)
     - name: Install Wikipedia APK on emulator
       run: |
-        # Install the APK on the Android Emulator
-        adb -s emulator-5554 install -r wikipedia.apk
+        # Wait for the emulator to fully boot up
+        adb wait-for-device
+        # Install the Wikipedia APK on the Android Emulator
+        adb install -r wikipedia.apk
 
     # Step 7: Run Maestro UI tests on Android Emulator
     - name: Run Maestro UI tests on Android
