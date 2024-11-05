@@ -8,7 +8,7 @@ env:
 jobs:
   run_android_e2e:
     timeout-minutes: 30
-    runs-on: macos-13  # Set macOS 13 as the runner environment
+    runs-on: macos-14
 
     steps:
       # Step 1: Checkout the code
